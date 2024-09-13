@@ -1,0 +1,17 @@
+{{- if .Values.podDisruptionBudget }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "codex.fullname" .}}
+  labels: {{ include "codex.labels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{ toYaml .Values.podDisruptionBudget | nindent 2 }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "codex.fullname" .}}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

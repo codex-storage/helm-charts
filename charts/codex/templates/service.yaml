@@ -1,0 +1,80 @@
+{{- range $replica_index := until (int .Values.replica.count) }}
+{{- range $type := $.Values.service.type }}
+{{- with $ }}
+{{- $pod_replica_suffix := ternary "" (print "-" (add $replica_index .Values.statefulSet.ordinalsStart)) (and (eq (int .Values.replica.count) 1) .Values.statefulSet.prettify) }}
+{{- $pod_suffix := print "-" .Values.statefulSet.ordinalsStart -}}
+{{- $pod_name := print (include "codex.fullname" .) $pod_replica_suffix $pod_suffix }}
+{{- $service_name := print (include "codex.fullname" .) $pod_replica_suffix (ternary ($pod_suffix) "" (eq (toString .Values.service.prettify) "false")) "-" $type }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $service_name }}
+  labels:
+    {{- include "codex.labels" . | nindent 4 }}
+    pod: {{ $pod_name }}
+spec:
+  {{- if eq $type "nodeport" }}
+  type: NodePort
+  externalTrafficPolicy: Local
+  {{- else }}
+  type: ClusterIP
+  {{- end }}
+  ports:
+    {{- /*
+    API port
+    */ -}}
+    {{- if ne $type "nodeport" }}
+    {{- if .Values.service.api.enabled }}
+    - port: {{ .Values.service.api.port }}
+      targetPort: {{ .Values.ports.api.name }}
+      protocol: TCP
+      name: api
+    {{- end }}
+    {{- /*
+    Metrics port
+    */ -}}
+    {{- if .Values.service.metrics.enabled }}
+    - port: {{ .Values.service.metrics.port }}
+      targetPort: {{ .Values.ports.metrics.name }}
+      protocol: TCP
+      name: metrics
+    {{- end }}
+    {{- end }}
+    {{- /*
+    Transport port
+    */ -}}
+    {{- if or (eq $type "nodeport") (eq (include "codex.service.nodeport.enabled" .) "false") }}
+    {{- if and .Values.service.transport.enabled }}
+    {{- $node_port_transport := add .Values.service.transport.nodePort (mul $replica_index .Values.service.transport.nodePortOffset) }}
+    - port: {{ $node_port_transport }}
+      targetPort: {{ .Values.ports.transport.name }}
+      {{- if and (eq $type "nodeport") .Values.service.transport.nodePort }}
+      nodePort: {{ $node_port_transport }}
+      {{- end }}
+      protocol: TCP
+      name: transport
+    {{- end }}
+    {{- /*
+    Discovery port
+    */ -}}
+    {{- if .Values.service.discovery.enabled }}
+    {{- $node_port_discovery := add .Values.service.discovery.nodePort (mul $replica_index .Values.service.discovery.nodePortOffset) }}
+    - port: {{ $node_port_discovery }}
+      targetPort: {{ .Values.ports.discovery.name }}
+      {{- if and (eq $type "nodeport") .Values.service.discovery.nodePort }}
+      nodePort: {{ $node_port_discovery }}
+      {{- end }}
+      protocol: UDP
+      name: discovery
+    {{- end }}
+    {{- end }}
+    {{- if .Values.extraPorts }}
+    {{- toYaml .Values.extraPorts | nindent 4 }}
+    {{- end }}
+  selector:
+    {{- include "codex.selectorLabels" . | nindent 4 }}
+    statefulset.kubernetes.io/pod-name: {{ $pod_name }}
+{{- end }}
+{{- end }}
+{{- end }}

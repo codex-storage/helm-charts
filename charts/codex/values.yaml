@@ -1,0 +1,442 @@
+# Default values for codex.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Override chart name
+nameOverride: ""
+
+# Override chart full name
+fullnameOverride: ""
+
+# Replicas
+replica:
+  # Replicas count
+  count: 1
+
+# StatefulSet
+statefulSet:
+  # First replica index
+  ordinalsStart: 1
+  # For single replica we will skip replica index in the StatefulSet name
+  # and it is useful only when no more than one replica is planned to be deployed
+  # otherwise, when replica will be increased > 1, previous StatefulSet will be deleted
+  # and new ones with index in the names will be created
+  # this is why by default we set it to false, to avoid destructive transition
+  #        name     StatefulSet
+  # true:  codex --> codex
+  # false: codex --> codex-1
+  prettify: false
+
+image:
+  # Image repository
+  repository: codexstorage/nim-codex
+  # Image tag
+  tag: latest
+  # Image pull policy
+  pullPolicy: IfNotPresent
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Lifecycle
+lifecycle: {}
+
+# Namespace
+namespaceOverride: ""
+
+# StatefulSet labels
+labels: {}
+  # foo: bar
+
+# StatefulSet annotations
+annotations: {}
+  # foo: bar
+
+# ServiceAccount is required for init-env container to get node External IP
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+  rbac:
+    # Specifies whether RBAC resources should be created
+    create: true
+    # rbac specific annotations
+    annotations: {}
+      # foo: bar
+    # rbac specific labels
+    labels: {}
+      # foo: bar
+    # Get node External IP
+    clusterRules:
+      - apiGroups: [""]
+        resources: ["nodes"]
+        verbs: ["get", "list", "watch"]
+    # Get service NodePort - not use currently
+    rules:
+      # - apiGroups: [""]
+      #   resources: ["services"]
+      #   verbs: ["get", "list", "watch"]
+
+# Pod labels
+podLabels: {}
+  # foo: bar
+
+# Pod annotations
+podAnnotations: {}
+  # foo: bar
+
+podSecurityContext: {}
+  # fsGroup: 1000
+  # runAsGroup: 1000
+  # runAsUser: 1000
+  # runAsNonRoot: true
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+# Codex container command with arguments
+codex:
+  command:
+  # known as Docker ENTRYPOINT
+  # - /bin/bash
+  # - /docker-entrypoint.sh
+  args:
+  # known as Docker CMD
+  # - codex
+  # - --bootstrap-node=spr:xxx
+  # - --bootstrap-node=spr:yyy
+  # - --data-dir=/data
+  #
+  # Codex configuration using environment variables
+  env:
+    # Logging
+    CODEX_LOG_LEVEL: INFO
+    # TRACE;warn:discv5,providers,manager,cache;warn:libp2p,multistream,switch,transport,tcptransport,semaphore,asyncstreamwrapper,lpstream,mplex,mplexchannel,noise,bufferstream,mplexcoder,secure,chronosstream,connection,connmanager,websock,ws-session
+    #
+    # Metrics
+    # CODEX_METRICS: true
+    # CODEX_METRICS_ADDRESS: 0.0.0.0
+    # CODEX_METRICS_PORT: 8008
+    #
+    # API
+    # CODEX_API_BINDADDR: 0.0.0.0
+    # CODEX_API_PORT: 8080
+    #
+    # P2P communication
+    # Currently, only one node can be set via env variable - https://github.com/codex-storage/nim-codex/issues/525
+    # and we can use codex.args to pass multiple bootstrap nodes
+    # CODEX_BOOTSTRAP: ""
+    # CODEX_NAT: "127.0.0.1"
+    CODEX_LISTEN_ADDRS: /ip4/0.0.0.0/tcp/8070
+    CODEX_DISC_IP: 0.0.0.0
+    CODEX_DISC_PORT: 8090
+    #
+    # Storage
+    CODEX_DATA_DIR: /data
+    # b, k/kb, m/mb, g/gb, t/tb, p/pb
+    # CODEX_STORAGE_QUOTA: 18gb
+    #
+    # Maintenance
+    # s, m, h, d, w
+    # CODEX_BLOCK_TTL: 1d
+    # CODEX_BLOCK_MI: 10m
+    # CODEX_BLOCK_MN: 1000
+    #
+    # Persistence
+    # CODEX_PERSISTENCE: false
+    # CODEX_ETH_PROVIDER: ws://localhost:8545
+    # CODEX_ETH_ACCOUNT: 0x1234567890123456789012345678901234567890
+    # file name `codex-eth-private-key` will be used as a secret name to be mounted to the Pod
+    # CODEX_ETH_PRIVATE_KEY: /opt/codex-eth-private-key
+    # CODEX_MARKETPLACE_ADDRESS: 0x1234567890123456789012345678901234567890
+
+  extraEnv:
+    - name: CODEX_ETH_PROVIDER
+      valueFrom:
+        secretKeyRef:
+          name: codex-eth-provider
+          key: CODEX_ETH_PROVIDER
+    - name: CODEX_ETH_ACCOUNT
+      valueFrom:
+        secretKeyRef:
+          name: codex_eth_account
+          key: CODEX_ETH_ACCOUNT_replica_index_pod_index
+
+  # Extra environment variables
+  # extraEnv:
+    # When multiple StatefulSets are created, we can use replica_index to pass different ConfigMap/Secrets to each replica
+    #      Value                                                    Secrets
+    # codex_eth_account_replica_index-pod_index --> codex_eth_account_1_1, codex_eth_account_2_1, codex_eth_account_3_1, ...
+    #
+    # - name: FOO
+    #   value: BAR
+    #
+    # - name: FOO_CONFIG
+    #   valueFrom:
+    #     configMapKeyRef:
+    #       name: configmap-name
+    #       key: configmap-key
+    #
+    # - name: FOO_SECRET
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: secret-name
+    #       key: secret-key
+    #
+    # - name: CODEX_ETH_ACCOUNT
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: codex_eth_account
+    #       key: codex_eth_account_replica_index-pod_index
+
+  # Marketplace storage for sale configuration
+  # We use postStart lifecycle hook to setup Codex node marketplace configuration via API
+  # mutually exclusive with the lifecycle configuration bellow
+  marketplace: {}
+    # totalSize: "8000000000"
+    # duration: "7200"
+    # minPrice: "10"
+    # maxCollateral: "10"
+
+# Init container to pass environment variables dynamically to each replica
+initEnv:
+  image:
+    # Image repository
+    repository: bitnami/kubectl
+    # Image tag
+    tag: latest
+    # Image pull policy
+    pullPolicy: IfNotPresent
+  # Enable init Env container - enabled automatically when replica.count > 1 and service.type.nodeport
+  enabled: false
+  command: ""
+  # command: >-
+  #     echo test
+  envPath: /opt/env
+
+# Pod ports
+ports:
+  api:
+    enabled: true
+    name: api
+    containerPort: 8080
+  metrics:
+    enabled: true
+    name: metrics
+    containerPort: 8008
+  transport:
+    enabled: true
+    name: libp2p
+    containerPort: 8070
+  discovery:
+    enabled: true
+    name: dht
+    containerPort: 8090
+
+# Service
+service:
+  # Service type to deploy - nodeport is required when Codex node should be reachable from the Internet
+  type:
+    - service
+    - nodeport
+  # Prettify service name
+  # single StatefulSet
+  # true:  codex-service   codex-nodeport
+  # false: codex-1-service codex-1-nodeport
+  # multiple StatefulSets
+  # true:  codex-1-service   codex-1-nodeport   codex-2-service   codex-2-nodeport
+  # false: codex-1-1-service codex-1-1-nodeport codex-2-1-service codex-2-1-nodeport
+  prettify: true
+  # API port
+  api:
+    enabled: true
+    port: 8080
+  # Metrics port
+  metrics:
+    enabled: true
+    port: 8008
+  # Transport port
+  transport:
+    enabled: true
+    # 30000-32767
+    nodePort: 30510
+    nodePortOffset: 10
+  # Discovery port
+  discovery:
+    enabled: true
+    # 30000-32767
+    nodePort: 30510
+    nodePortOffset: 10
+
+# Extra container ports
+extraContainerPorts: []
+  # - name: foo
+  #   containerPort: 1234
+  #   protocol: TCP
+
+# Extra ports
+extraPorts: []
+  # - name: foo
+  #   port: 1234
+  #   protocol: TCP
+
+# Ingress for Codex API
+ingress:
+  # Enable ingress
+  enabled: false
+  # Override chart full name
+  fullnameOverride: ""
+  # Ingress class
+  class: nginx
+  prettify: false
+  # Ingress annotations
+  annotations:
+    # kubernetes.io/ingress.class: "nginx"
+    # cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    # nginx.ingress.kubernetes.io/use-regex: "true"
+    # nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # nginx.ingress.kubernetes.io/auth-type: basic
+    # nginx.ingress.kubernetes.io/auth-secret: api-domain-tld-basic-auth
+    # nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required - Private Area'
+  tls:
+    - secretName: api-domain-tld
+      hosts:
+        - api.domain.tld
+  hosts:
+    - host: api.domain.tld
+      paths:
+        # When podName is blank, URL will use deployed Pod name
+        # https://api.domain.tld/pod-name-1
+        # https://api.domain.tld/pod-name-2
+        - path: /
+          rewritePath: (/|$)(.*)
+          pathType: Prefix
+        # When podName is set, in URL we will use that value instead of the deployed Pod name
+        # When prettify is set to false, Pod URI will contain the StatefulSet Pod index
+        # leadingZeros specify the number of digits in the endpoint Pod name - pod-name-1/01/001
+        # https://api.domain.tld/endpoints/node-01-1
+        # https://api.domain.tld/endpoints/node-02-1
+        - path: /storage
+          rewritePath: (/|$)(.*)
+          pathType: Prefix
+          podName: node
+          prettify: false
+          leadingZeros: 2
+
+# Pod resources
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+# Startup probe
+startupProbe: {}
+
+# Liveness probe
+livenessProbe:
+  httpGet:
+    path: /api/codex/v1/debug/info
+    port: '{{ .Values.ports.api.name }}'
+    scheme: HTTP
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 1200
+
+# Readiness probe
+readinessProbe:
+  httpGet:
+    path: /api/codex/v1/debug/info
+    port: '{{ .Values.ports.api.name }}'
+    scheme: HTTP
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 1200
+
+# Persistence
+persistence:
+  # Enable persistence using Persistent Volume Claims
+  enabled: true
+  # Name prefix for Persistent Volume Claims
+  name: data
+  # Use an existing PVC to persist data
+  existingClaim: ""
+  # Access mode of data volume
+  accessModes:
+    - ReadWriteOnce
+  # Size of data volume
+  size: 10Gi
+  # Storage class of data volume
+  storageClassName: ""
+  # Annotations for volume claim template
+  annotations: {}
+  #  foo: bar
+  # Selector for volume claim template
+  selector: {}
+  #   matchLabels:
+  #     foo: bar
+  retentionPolicy:
+    whenDeleted: Retain
+
+# Additional volumes on the output Deployment definition.
+volumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts: []
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
+
+initContainers: []
+  # - name: datadir-cleanup
+  #   image: busybox:latest
+  #   command:
+  #     - sh
+  #     - -c
+  #     - |
+  #         echo "clean-up datadir"
+  #         rm -rf {{ .Values.codex.env.CODEX_DATA_DIR }}/*
+  #   volumeMounts:
+  #     - name: '{{ .Values.persistence.name }}'
+  #       mountPath: '{{ .Values.codex.env.CODEX_DATA_DIR }}'
+
+# Additional
+extraContainers: []
+# - name: extra
+#   image: busybox:latest
+#   command: ['sh', '-c', 'echo "hello"']
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+topologySpreadConstraints: []
+
+terminationGracePeriodSeconds: 120
+
+podDisruptionBudget: {}
+  # maxUnavailable: 1
+  # minAvailable: 1
