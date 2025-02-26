@@ -206,8 +206,8 @@ codex:
   marketplace: {}
     # totalSize: "8000000000"
     # duration: "7200"
-    # minPrice: "10"
-    # maxCollateral: "10"
+    # minPricePerBytePerSecond: "10"
+    # totalCollateral: "9999999999999999"
 
 # Init container to pass environment variables dynamically to each replica
 initEnv:

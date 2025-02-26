@@ -67,7 +67,7 @@ spec:
               {{- .Values.initEnv.command | toYaml | nindent 14 }}
               {{- else }}
               CODEX_NAT=$(kubectl get nodes ${NODE_NAME} -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}');
-              echo "CODEX_NAT=${CODEX_NAT}" >> ${NODEPORT_FILE};
+              echo "CODEX_NAT=extip:${CODEX_NAT}" >> ${NODEPORT_FILE};
               cat ${NODEPORT_FILE};
               {{- end }}
           volumeMounts:
@@ -108,8 +108,8 @@ spec:
                         --data '{
                           "totalSize": "{{ .Values.codex.marketplace.totalSize }}",
                           "duration": "{{ .Values.codex.marketplace.duration }}",
-                          "minPrice": "{{ .Values.codex.marketplace.minPrice }}",
-                          "maxCollateral": "{{ .Values.codex.marketplace.maxCollateral }}"
+                          "minPricePerBytePerSecond": "{{ .Values.codex.marketplace.minPricePerBytePerSecond }}",
+                          "totalCollateral": "{{ .Values.codex.marketplace.totalCollateral }}"
                         }')
                         echo -e "Storage availability was configured \n${availability}" >/opt/storage-availability
                       else
